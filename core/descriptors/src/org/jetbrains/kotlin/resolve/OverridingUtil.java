@@ -121,12 +121,17 @@ public class OverridingUtil {
             if (cancellationCallback != null) {
                 cancellationCallback.invoke();
             }
-            for (Iterator<D> iterator = result.iterator(); iterator.hasNext(); ) {
+            innerLoop: for (Iterator<D> iterator = result.iterator(); iterator.hasNext(); ) {
                 D otherD = iterator.next();
                 Pair<CallableDescriptor, CallableDescriptor> meAndOther = transformFirst.invoke(meD, otherD);
                 CallableDescriptor me = meAndOther.component1();
                 CallableDescriptor other = meAndOther.component2();
-                if (overrides(me, other, allowDescriptorCopies)) {
+                if (me instanceof MemberDescriptor
+                    && other instanceof MemberDescriptor
+                    && ((MemberDescriptor) me).isExpect() != ((MemberDescriptor) other).isExpect()) {
+                    continue innerLoop;
+                }
+                else if (overrides(me, other, allowDescriptorCopies)) {
                     iterator.remove();
                 }
                 else if (overrides(other, me, allowDescriptorCopies)) {
