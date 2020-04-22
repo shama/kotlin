@@ -68,7 +68,7 @@ public class KotlinPrimaryConstructorParameterTableModel extends KotlinCallableP
 
         @Override
         public TableCellRenderer doCreateRenderer(ParameterTableModelItemBase<KotlinParameterInfo> item) {
-            return new ComboBoxTableRenderer<>(KotlinValVar.values());
+            return new ComboBoxTableRenderer<>(item.parameter.getAllowedValVarSpecifiers());
         }
 
         @Override

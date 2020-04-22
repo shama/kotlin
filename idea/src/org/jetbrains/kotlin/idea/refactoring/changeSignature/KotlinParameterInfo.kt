@@ -39,6 +39,8 @@ class KotlinParameterInfo @JvmOverloads constructor(
 ) : ParameterInfo {
     var currentTypeInfo: KotlinTypeInfo = originalTypeInfo
 
+    val allowedValVarSpecifiers: Array<KotlinValVar> = KotlinValVar.values()
+
     val defaultValueParameterReferences: Map<PsiReference, DeclarationDescriptor> by lazy {
         collectDefaultValueParameterReferences(defaultValueForCall)
     }

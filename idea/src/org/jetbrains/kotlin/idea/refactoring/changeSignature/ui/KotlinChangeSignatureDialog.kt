@@ -197,7 +197,7 @@ class KotlinChangeSignatureDialog(
                         editor = EditorTextField(document, project, fileType)
                         component = editor
                     } else if (KotlinPrimaryConstructorParameterTableModel.isValVarColumn(columnInfo)) {
-                        val comboBox = ComboBox(KotlinValVar.values())
+                        val comboBox = ComboBox(item.parameter.allowedValVarSpecifiers)
                         comboBox.selectedItem = item.parameter.valOrVar
                         comboBox.addItemListener {
                             parametersTableModel.setValueAtWithoutUpdate(it.item, row, columnFinal)
