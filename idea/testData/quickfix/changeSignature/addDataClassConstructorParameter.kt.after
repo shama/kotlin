@@ -1,0 +1,6 @@
+// "Add parameter to constructor 'Base'" "true"
+// DISABLE-ERRORS
+
+data class Base(var x: Int, val i: Int)
+
+val base = Base(10, 20)

@@ -27,6 +27,18 @@ import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.scopes.receivers.ImplicitReceiver
 import org.jetbrains.kotlin.types.isError
 
+private fun defaultValVarSpecifierForDescriptorParameter(descriptor: CallableDescriptor): KotlinValVar =
+    if (descriptor is ConstructorDescriptor && descriptor.isPrimary && descriptor.constructedClass.isData)
+        KotlinValVar.Val
+    else
+        KotlinValVar.None
+
+private fun allowedValVarSpecifiersForDescriptorParameter(descriptor: CallableDescriptor): Array<KotlinValVar> {
+    if (!(descriptor is ConstructorDescriptor && descriptor.isPrimary)) return arrayOf(KotlinValVar.None)
+
+    return if (descriptor.constructedClass.isData) arrayOf(KotlinValVar.Val, KotlinValVar.Var) else KotlinValVar.values()
+}
+
 class KotlinParameterInfo @JvmOverloads constructor(
     val callableDescriptor: CallableDescriptor,
     val originalIndex: Int = -1,
@@ -34,12 +46,24 @@ class KotlinParameterInfo @JvmOverloads constructor(
     val originalTypeInfo: KotlinTypeInfo = KotlinTypeInfo(false),
     var defaultValueForParameter: KtExpression? = null,
     var defaultValueForCall: KtExpression? = null,
-    var valOrVar: KotlinValVar = KotlinValVar.None,
+    valOrVar: KotlinValVar = defaultValVarSpecifierForDescriptorParameter(callableDescriptor),
     val modifierList: KtModifierList? = null
 ) : ParameterInfo {
     var currentTypeInfo: KotlinTypeInfo = originalTypeInfo
 
-    val allowedValVarSpecifiers: Array<KotlinValVar> = KotlinValVar.values()
+    val allowedValVarSpecifiers: Array<KotlinValVar> = allowedValVarSpecifiersForDescriptorParameter(callableDescriptor)
+
+    var valOrVar: KotlinValVar = KotlinValVar.None
+        set(value) {
+            require(value in allowedValVarSpecifiers) {
+                "Val/var specifier $value for $callableDescriptor parameter should be one of [${allowedValVarSpecifiers.joinToString()}]"
+            }
+            field = value
+        }
+
+    init {
+        this.valOrVar = valOrVar
+    }
 
     val defaultValueParameterReferences: Map<PsiReference, DeclarationDescriptor> by lazy {
         collectDefaultValueParameterReferences(defaultValueForCall)
