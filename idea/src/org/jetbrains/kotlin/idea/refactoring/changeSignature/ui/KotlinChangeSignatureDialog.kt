@@ -22,6 +22,7 @@ import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.options.ConfigurationException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.VerticalFlowLayout
 import com.intellij.openapi.util.text.StringUtil
@@ -119,8 +120,8 @@ class KotlinChangeSignatureDialog(
         field.font = Font(plainFont.fontName, plainFont.style, 12)
 
         if (selected && focused) {
-            panel.background = UIUtil.getTableSelectionBackground()
-            field.setAsRendererWithSelection(UIUtil.getTableSelectionBackground(), UIUtil.getTableSelectionForeground())
+            panel.background = UIUtil.getTableSelectionBackground(true)
+            field.setAsRendererWithSelection(UIUtil.getTableSelectionBackground(true), UIUtil.getTableSelectionForeground(true))
         } else {
             panel.background = UIUtil.getTableBackground()
             if (selected && !focused) {
@@ -196,7 +197,7 @@ class KotlinChangeSignatureDialog(
                         editor = EditorTextField(document, project, fileType)
                         component = editor
                     } else if (KotlinPrimaryConstructorParameterTableModel.isValVarColumn(columnInfo)) {
-                        val comboBox = JComboBox(KotlinValVar.values())
+                        val comboBox = ComboBox(KotlinValVar.values())
                         comboBox.selectedItem = item.parameter.valOrVar
                         comboBox.addItemListener {
                             parametersTableModel.setValueAtWithoutUpdate(it.item, row, columnFinal)
@@ -245,7 +246,7 @@ class KotlinChangeSignatureDialog(
 
                     when {
                         KotlinPrimaryConstructorParameterTableModel.isValVarColumn(columnInfo) ->
-                            (components[column] as @Suppress("NO_TYPE_ARGUMENTS_ON_RHS") JComboBox).selectedItem
+                            (components[column] as ComboBox<*>).selectedItem
                         KotlinCallableParameterTableModel.isTypeColumn(columnInfo) ->
                             item.typeCodeFragment
                         KotlinCallableParameterTableModel.isNameColumn(columnInfo) ->

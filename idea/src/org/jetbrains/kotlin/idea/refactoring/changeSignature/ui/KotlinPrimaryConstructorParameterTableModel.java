@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.idea.refactoring.changeSignature.ui;
 
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.ComboBoxTableRenderer;
 import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.changeSignature.ParameterTableModelItemBase;
@@ -36,12 +37,12 @@ public class KotlinPrimaryConstructorParameterTableModel extends KotlinCallableP
               typeContext,
               defaultValueContext,
               new ValVarColumn(),
-              new NameColumn(typeContext.getProject()),
-              new TypeColumn(typeContext.getProject(), KotlinFileType.INSTANCE),
-              new DefaultValueColumn<KotlinParameterInfo, ParameterTableModelItemBase<KotlinParameterInfo>>(typeContext.getProject(), KotlinFileType.INSTANCE));
+              new NameColumn<>(typeContext.getProject()),
+              new TypeColumn<>(typeContext.getProject(), KotlinFileType.INSTANCE),
+              new DefaultValueColumn<>(typeContext.getProject(), KotlinFileType.INSTANCE));
     }
 
-    public static boolean isValVarColumn(ColumnInfo column) {
+    public static boolean isValVarColumn(ColumnInfo<?, ?> column) {
         return column instanceof ValVarColumn;
     }
 
@@ -67,12 +68,12 @@ public class KotlinPrimaryConstructorParameterTableModel extends KotlinCallableP
 
         @Override
         public TableCellRenderer doCreateRenderer(ParameterTableModelItemBase<KotlinParameterInfo> item) {
-            return new ComboBoxTableRenderer<KotlinValVar>(KotlinValVar.values());
+            return new ComboBoxTableRenderer<>(KotlinValVar.values());
         }
 
         @Override
         public TableCellEditor doCreateEditor(ParameterTableModelItemBase<KotlinParameterInfo> item) {
-            return new DefaultCellEditor(new JComboBox());
+            return new DefaultCellEditor(new ComboBox<KotlinValVar>());
         }
 
         @Override

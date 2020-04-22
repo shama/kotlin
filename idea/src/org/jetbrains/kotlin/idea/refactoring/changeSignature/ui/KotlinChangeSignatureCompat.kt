@@ -8,24 +8,22 @@ package org.jetbrains.kotlin.idea.refactoring.changeSignature.ui
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.Messages.OkCancelResult
-import org.jetbrains.kotlin.descriptors.Visibility
+import org.jetbrains.annotations.Nls
 import javax.swing.Icon
-
-// BUNCH: 193
 
 @OkCancelResult
 fun showOkCancelDialog(
     project: Project?,
-    message: String?,
-    title: String,
+    @Nls message: String?,
+    @Nls title: String,
     icon: Icon?
 ): Int {
     return Messages.showOkCancelDialog(
         project,
         message,
         title,
+        Messages.OK_BUTTON,
+        Messages.CANCEL_BUTTON,
         icon
     )
 }
-
-typealias ComboBox = javax.swing.JComboBox<Visibility>
