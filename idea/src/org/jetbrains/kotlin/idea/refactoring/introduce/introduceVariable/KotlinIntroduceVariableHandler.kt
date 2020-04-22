@@ -298,7 +298,7 @@ object KotlinIntroduceVariableHandler : RefactoringActionHandler {
             }
             commonParent.putCopyableUserData(COMMON_PARENT_KEY, true)
 
-            val newDeclaration = ConvertToBlockBodyIntention.convert(commonContainer)
+            val newDeclaration = ConvertToBlockBodyIntention.convert(commonContainer, false)
 
             val newCommonContainer = newDeclaration.bodyBlockExpression.sure { "New body is not found: $newDeclaration" }
 
@@ -311,7 +311,13 @@ object KotlinIntroduceVariableHandler : RefactoringActionHandler {
                 } ?: newReplace
             }
 
-            runRefactoring(isVar, newExpression ?: return, newCommonContainer, newCommonParent, newAllReplaces)
+            runRefactoring(
+                isVar,
+                newExpression ?: return,
+                newCommonContainer,
+                newCommonParent ?: return,
+                newAllReplaces
+            )
         }
     }
 
