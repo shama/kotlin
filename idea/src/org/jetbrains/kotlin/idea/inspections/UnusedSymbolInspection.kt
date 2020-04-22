@@ -88,7 +88,7 @@ import java.util.*
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-class UnusedSymbolInspection : AbstractKotlinInspection() {
+class UnusedSymbolInspection : AbstractPartialContextProviderInspection() {
     companion object {
         private val javaInspection = UnusedDeclarationInspection()
 
@@ -198,7 +198,7 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
         }
     }
 
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor {
         return namedDeclarationVisitor(fun(declaration) {
             ProgressManager.checkCanceled()
             val message = declaration.describe()?.let { "$it is never used" } ?: return
@@ -216,7 +216,8 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
             ) return
 
             // More expensive, resolve-based checks
-            val descriptor = declaration.resolveToDescriptorIfAny() ?: return
+            val context = bindingContextProvider.resolve(declaration) ?: return
+            val descriptor = declaration.resolveToDescriptorIfAny(context) ?: return
             if (descriptor is FunctionDescriptor && descriptor.isOperator) return
             if (isEntryPoint(declaration)) return
             if (declaration.isFinalizeMethod(descriptor)) return

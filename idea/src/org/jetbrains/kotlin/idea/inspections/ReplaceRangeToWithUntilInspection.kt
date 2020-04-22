@@ -27,7 +27,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 
 class ReplaceRangeToWithUntilInspection : AbstractPrimitiveRangeToInspection() {
-    override fun visitRangeToExpression(expression: KtExpression, holder: ProblemsHolder) {
+    override fun visitRangeToExpression(expression: KtExpression, holder: ProblemsHolder, bindingContextProvider: PartialBindingContextProvider) {
         if (!isApplicable(expression)) return
         holder.registerProblem(
             expression,

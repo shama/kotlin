@@ -20,10 +20,10 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
 class EmptyRangeInspection : AbstractPrimitiveRangeToInspection() {
-    override fun visitRangeToExpression(expression: KtExpression, holder: ProblemsHolder) {
+    override fun visitRangeToExpression(expression: KtExpression, holder: ProblemsHolder, bindingContextProvider: PartialBindingContextProvider) {
         val (left, right) = expression.getArguments() ?: return
 
-        val context = expression.analyze(BodyResolveMode.PARTIAL)
+        val context = bindingContextProvider.resolve(expression) ?: return
         val startValue = left?.longValueOrNull(context) ?: return
         val endValue = right?.longValueOrNull(context) ?: return
 

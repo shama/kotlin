@@ -265,11 +265,31 @@ fun KtClass.getOrCreateCompanionObject(): KtObjectDeclaration {
 }
 
 fun KtDeclaration.toDescriptor(): DeclarationDescriptor? {
-    if (this is KtScriptInitializer) {
+    if (isKtScriptInitializer()) {
         return null
     }
 
     val bindingContext = analyze()
+    // TODO: temporary code
+    if (this is KtPrimaryConstructor) {
+        return this.getContainingClassOrObject().resolveToDescriptorIfAny()?.unsubstitutedPrimaryConstructor
+    }
+
+    val descriptor = bindingContext[BindingContext.DECLARATION_TO_DESCRIPTOR, this]
+    if (descriptor is ValueParameterDescriptor) {
+        return bindingContext[BindingContext.VALUE_PARAMETER_AS_PROPERTY, descriptor]
+    }
+    return descriptor
+}
+
+fun KtDeclaration.isKtScriptInitializer() =
+    this is KtScriptInitializer
+
+fun KtDeclaration.toDescriptor(bindingContextProvider: () -> BindingContext?): DeclarationDescriptor? {
+    if (isKtScriptInitializer())
+        return null
+
+    val bindingContext = bindingContextProvider() ?: return null
     // TODO: temporary code
     if (this is KtPrimaryConstructor) {
         return this.getContainingClassOrObject().resolveToDescriptorIfAny()?.unsubstitutedPrimaryConstructor

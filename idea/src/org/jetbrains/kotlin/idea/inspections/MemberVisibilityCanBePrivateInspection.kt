@@ -48,34 +48,41 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.*
 
-class MemberVisibilityCanBePrivateInspection : AbstractKotlinInspection() {
+class MemberVisibilityCanBePrivateInspection : AbstractPartialContextProviderInspection() {
 
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+    override fun buildVisitor(
+        holder: ProblemsHolder,
+        isOnTheFly: Boolean,
+        bindingContextProvider: PartialBindingContextProvider
+    ): PsiElementVisitor {
         return object : KtVisitorVoid() {
             override fun visitProperty(property: KtProperty) {
                 super.visitProperty(property)
-                if (!property.isLocal && canBePrivate(property)) {
+                if (!property.isLocal && canBePrivate(property, bindingContextProvider)) {
                     registerProblem(holder, property)
                 }
             }
 
             override fun visitNamedFunction(function: KtNamedFunction) {
                 super.visitNamedFunction(function)
-                if (canBePrivate(function)) {
+                if (canBePrivate(function, bindingContextProvider)) {
                     registerProblem(holder, function)
                 }
             }
 
             override fun visitParameter(parameter: KtParameter) {
                 super.visitParameter(parameter)
-                if (parameter.isConstructorDeclaredProperty() && canBePrivate(parameter)) {
+                if (parameter.isConstructorDeclaredProperty() && canBePrivate(parameter, bindingContextProvider)) {
                     registerProblem(holder, parameter)
                 }
             }
         }
     }
 
-    private fun canBePrivate(declaration: KtNamedDeclaration): Boolean {
+    private fun canBePrivate(
+        declaration: KtNamedDeclaration,
+        bindingContextProvider: PartialBindingContextProvider
+    ): Boolean {
         if (declaration.hasModifier(KtTokens.PRIVATE_KEYWORD) || declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD)) return false
         if (declaration.annotationEntries.isNotEmpty()) return false
 
@@ -84,7 +91,8 @@ class MemberVisibilityCanBePrivateInspection : AbstractKotlinInspection() {
         if (!inheritable && declaration.hasModifier(KtTokens.PROTECTED_KEYWORD)) return false //reported by ProtectedInFinalInspection
         if (declaration.isOverridable()) return false
 
-        val descriptor = (declaration.toDescriptor() as? DeclarationDescriptorWithVisibility) ?: return false
+        val declarationDescriptor = declaration.toDescriptor { bindingContextProvider.resolve(declaration) } ?: return false
+        val descriptor = (declarationDescriptor as? DeclarationDescriptorWithVisibility) ?: return false
         when (descriptor.effectiveVisibility()) {
             EffectiveVisibility.Private, EffectiveVisibility.Local -> return false
         }
@@ -123,8 +131,8 @@ class MemberVisibilityCanBePrivateInspection : AbstractKotlinInspection() {
                 return@Processor false
             }
             val classOrObjectDescriptor = classOrObject.descriptor as? ClassDescriptor
-            if (classOrObjectDescriptor != null) {
-                val receiverType = (usage as? KtElement)?.resolveToCall()?.dispatchReceiver?.type
+            if (classOrObjectDescriptor != null && usage is KtElement) {
+                val receiverType = bindingContextProvider.resolveToCall(usage)?.dispatchReceiver?.type
                 val receiverDescriptor = receiverType?.constructor?.declarationDescriptor
                 if (receiverDescriptor != null && receiverDescriptor != classOrObjectDescriptor) {
                     otherUsageFound = true

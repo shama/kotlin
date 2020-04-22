@@ -11,6 +11,7 @@ import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.imports.importableFqName
 import org.jetbrains.kotlin.idea.inspections.AbstractResultUnusedChecker
+import org.jetbrains.kotlin.idea.inspections.PartialBindingContextProvider
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.callExpressionVisitor
@@ -32,9 +33,9 @@ class DeferredResultUnusedInspection(@JvmField var standardOnly: Boolean = false
         }
     }
 ) {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor =
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor =
         callExpressionVisitor(fun(expression) {
-            if (!check(expression)) return
+            if (!check(expression, bindingContextProvider)) return
             holder.registerProblem(expression.calleeExpression ?: expression, KotlinBundle.message("deferred.result.is.never.used"))
         })
 
