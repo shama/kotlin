@@ -13,7 +13,6 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.actions.generate.KotlinGenerateEqualsAndHashcodeAction
-import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
@@ -21,16 +20,15 @@ import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.classVisitor
 import org.jetbrains.kotlin.psi.psiUtil.getNonStrictParentOfType
 import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
-class ArrayInDataClassInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
+class ArrayInDataClassInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor {
         return classVisitor { klass ->
             if (!klass.isData()) return@classVisitor
             val constructor = klass.primaryConstructor ?: return@classVisitor
-            if (hasOverriddenEqualsAndHashCode(klass)) return@classVisitor
-            val context = constructor.analyze(BodyResolveMode.PARTIAL)
+            if (hasOverriddenEqualsAndHashCode(klass, bindingContextProvider)) return@classVisitor
+            val context = bindingContextProvider.resolve(constructor) ?: return@classVisitor
             for (parameter in constructor.valueParameters) {
                 if (!parameter.hasValOrVar()) continue
                 val type = context.get(BindingContext.TYPE, parameter.typeReference) ?: continue
@@ -46,14 +44,18 @@ class ArrayInDataClassInspection : AbstractKotlinInspection() {
         }
     }
 
-    private fun hasOverriddenEqualsAndHashCode(klass: KtClass): Boolean {
+    private fun hasOverriddenEqualsAndHashCode(
+        klass: KtClass,
+        bindingContextProvider: PartialBindingContextProvider
+    ): Boolean {
         var overriddenEquals = false
         var overriddenHashCode = false
         for (declaration in klass.declarations) {
             if (declaration !is KtFunction) continue
             if (!declaration.hasModifier(KtTokens.OVERRIDE_KEYWORD)) continue
             if (declaration.nameAsName == OperatorNameConventions.EQUALS && declaration.valueParameters.size == 1) {
-                val type = (declaration.resolveToDescriptorIfAny() as? FunctionDescriptor)?.valueParameters?.singleOrNull()?.type
+                val declarationDescriptor = bindingContextProvider.resolveToDeclaration(declaration)
+                val type = (declarationDescriptor as? FunctionDescriptor)?.valueParameters?.singleOrNull()?.type
                 if (type != null && KotlinBuiltIns.isNullableAny(type)) {
                     overriddenEquals = true
                 }
