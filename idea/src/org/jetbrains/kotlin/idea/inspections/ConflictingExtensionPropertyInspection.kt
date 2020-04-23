@@ -8,7 +8,6 @@ package org.jetbrains.kotlin.idea.inspections
 import com.intellij.codeInsight.FileModificationService
 import com.intellij.codeInsight.intention.LowPriorityAction
 import com.intellij.codeInspection.IntentionWrapper
-import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.application.ModalityState
@@ -26,8 +25,6 @@ import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
-import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
-import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.caches.resolve.unsafeResolveToDescriptor
 import org.jetbrains.kotlin.idea.core.targetDescriptors
 import org.jetbrains.kotlin.idea.imports.importableFqName
@@ -50,15 +47,19 @@ import org.jetbrains.kotlin.resolve.scopes.collectSyntheticExtensionProperties
 import org.jetbrains.kotlin.synthetic.SyntheticJavaPropertyDescriptor
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
-class ConflictingExtensionPropertyInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
-        val file = session.file as? KtFile ?: return PsiElementVisitor.EMPTY_VISITOR
+class ConflictingExtensionPropertyInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(
+        holder: ProblemsHolder,
+        isOnTheFly: Boolean,
+        bindingContextProvider: PartialBindingContextProvider
+    ): PsiElementVisitor {
+        val file = bindingContextProvider.session.file as? KtFile ?: return PsiElementVisitor.EMPTY_VISITOR
         val resolutionFacade = file.getResolutionFacade()
 
         return propertyVisitor(fun(property: KtProperty) {
             if (property.receiverTypeReference != null) {
                 val nameElement = property.nameIdentifier ?: return
-                val propertyDescriptor = property.resolveToDescriptorIfAny() as? PropertyDescriptor ?: return
+                val propertyDescriptor = bindingContextProvider.resolveToVariableDescriptor(property) as? PropertyDescriptor ?: return
 
                 val syntheticScopes = resolutionFacade.frontendService<SyntheticScopes>()
                 val conflictingExtension = conflictingSyntheticExtension(propertyDescriptor, syntheticScopes) ?: return
@@ -66,7 +67,7 @@ class ConflictingExtensionPropertyInspection : AbstractKotlinInspection() {
                 // don't report on hidden declarations
                 if (resolutionFacade.frontendService<DeprecationResolver>().isHiddenInResolution(propertyDescriptor)) return
 
-                val fixes = createFixes(property, conflictingExtension, isOnTheFly)
+                val fixes = createFixes(property, conflictingExtension, isOnTheFly, bindingContextProvider)
 
                 val problemDescriptor = holder.manager.createProblemDescriptor(
                     nameElement,
@@ -86,60 +87,60 @@ class ConflictingExtensionPropertyInspection : AbstractKotlinInspection() {
             .firstIsInstanceOrNull<SyntheticJavaPropertyDescriptor>()
     }
 
-    private fun isSameAsSynthetic(declaration: KtProperty, syntheticProperty: SyntheticJavaPropertyDescriptor): Boolean {
+    private fun isSameAsSynthetic(declaration: KtProperty, syntheticProperty: SyntheticJavaPropertyDescriptor, bindingContextProvider: PartialBindingContextProvider): Boolean {
         val getter = declaration.getter ?: return false
         val setter = declaration.setter
 
-        if (!checkGetterBodyIsGetMethodCall(getter, syntheticProperty.getMethod)) return false
+        if (!checkGetterBodyIsGetMethodCall(getter, syntheticProperty.getMethod, bindingContextProvider)) return false
 
         if (setter != null) {
             val setMethod = syntheticProperty.setMethod ?: return false // synthetic property is val but our property is var
-            if (!checkSetterBodyIsSetMethodCall(setter, setMethod)) return false
+            if (!checkSetterBodyIsSetMethodCall(setter, setMethod, bindingContextProvider)) return false
         }
 
         return true
     }
 
-    private fun checkGetterBodyIsGetMethodCall(getter: KtPropertyAccessor, getMethod: FunctionDescriptor): Boolean {
+    private fun checkGetterBodyIsGetMethodCall(getter: KtPropertyAccessor, getMethod: FunctionDescriptor, bindingContextProvider: PartialBindingContextProvider): Boolean {
         return if (getter.hasBlockBody()) {
             val statement = getter.bodyBlockExpression?.statements?.singleOrNull() ?: return false
-            (statement as? KtReturnExpression)?.returnedExpression.isGetMethodCall(getMethod)
+            (statement as? KtReturnExpression)?.returnedExpression.isGetMethodCall(getMethod, bindingContextProvider)
         } else {
-            getter.bodyExpression.isGetMethodCall(getMethod)
+            getter.bodyExpression.isGetMethodCall(getMethod, bindingContextProvider)
         }
     }
 
-    private fun checkSetterBodyIsSetMethodCall(setter: KtPropertyAccessor, setMethod: FunctionDescriptor): Boolean {
+    private fun checkSetterBodyIsSetMethodCall(setter: KtPropertyAccessor, setMethod: FunctionDescriptor, bindingContextProvider: PartialBindingContextProvider): Boolean {
         val valueParameterName = setter.valueParameters.singleOrNull()?.nameAsName ?: return false
         if (setter.hasBlockBody()) {
             val statement = setter.bodyBlockExpression?.statements?.singleOrNull() ?: return false
-            return statement.isSetMethodCall(setMethod, valueParameterName)
+            return statement.isSetMethodCall(setMethod, valueParameterName, bindingContextProvider)
         } else {
-            return setter.bodyExpression.isSetMethodCall(setMethod, valueParameterName)
+            return setter.bodyExpression.isSetMethodCall(setMethod, valueParameterName, bindingContextProvider)
         }
     }
 
-    private fun KtExpression?.isGetMethodCall(getMethod: FunctionDescriptor): Boolean = when (this) {
+    private fun KtExpression?.isGetMethodCall(getMethod: FunctionDescriptor, bindingContextProvider: PartialBindingContextProvider): Boolean = when (this) {
         is KtCallExpression -> {
-            val resolvedCall = resolveToCall()
+            val resolvedCall = bindingContextProvider.resolveToCall(this)
             resolvedCall != null && resolvedCall.isReallySuccess() && resolvedCall.resultingDescriptor.original == getMethod.original
         }
 
         is KtQualifiedExpression -> {
             val receiver = receiverExpression
-            receiver is KtThisExpression && receiver.labelQualifier == null && selectorExpression.isGetMethodCall(getMethod)
+            receiver is KtThisExpression && receiver.labelQualifier == null && selectorExpression.isGetMethodCall(getMethod, bindingContextProvider)
         }
 
         else -> false
     }
 
-    private fun KtExpression?.isSetMethodCall(setMethod: FunctionDescriptor, valueParameterName: Name): Boolean {
+    private fun KtExpression?.isSetMethodCall(setMethod: FunctionDescriptor, valueParameterName: Name, bindingContextProvider: PartialBindingContextProvider): Boolean {
         when (this) {
             is KtCallExpression -> {
                 if ((valueArguments.singleOrNull()
                         ?.getArgumentExpression() as? KtSimpleNameExpression)?.getReferencedNameAsName() != valueParameterName
                 ) return false
-                val resolvedCall = resolveToCall()
+                val resolvedCall = bindingContextProvider.resolveToCall(this)
                 return resolvedCall != null &&
                         resolvedCall.isReallySuccess() &&
                         resolvedCall.resultingDescriptor.original == setMethod.original
@@ -149,7 +150,8 @@ class ConflictingExtensionPropertyInspection : AbstractKotlinInspection() {
                 val receiver = receiverExpression
                 return receiver is KtThisExpression && receiver.labelQualifier == null && selectorExpression.isSetMethodCall(
                     setMethod,
-                    valueParameterName
+                    valueParameterName,
+                    bindingContextProvider
                 )
             }
 
@@ -160,9 +162,10 @@ class ConflictingExtensionPropertyInspection : AbstractKotlinInspection() {
     private fun createFixes(
         property: KtProperty,
         conflictingExtension: SyntheticJavaPropertyDescriptor,
-        isOnTheFly: Boolean
+        isOnTheFly: Boolean,
+        bindingContextProvider: PartialBindingContextProvider
     ): Array<IntentionWrapper> {
-        return if (isSameAsSynthetic(property, conflictingExtension)) {
+        return if (isSameAsSynthetic(property, conflictingExtension, bindingContextProvider)) {
             val fix1 = IntentionWrapper(DeleteRedundantExtensionAction(property), property.containingFile)
             // don't add the second fix when on the fly to allow code cleanup
             val fix2 = if (isOnTheFly)

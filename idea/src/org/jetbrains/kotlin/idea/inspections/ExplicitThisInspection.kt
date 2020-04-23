@@ -36,11 +36,11 @@ import org.jetbrains.kotlin.resolve.lazy.descriptors.LazyClassDescriptor
 import org.jetbrains.kotlin.synthetic.SyntheticJavaPropertyDescriptor
 import org.jetbrains.kotlin.types.typeUtil.isSubtypeOf
 
-class ExplicitThisInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean) = object : KtVisitorVoid() {
+class ExplicitThisInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider) = object : KtVisitorVoid() {
         override fun visitExpression(expression: KtExpression) {
             val thisExpression = expression.thisAsReceiverOrNull() ?: return
-            if (hasExplicitThis(expression)) {
+            if (hasExplicitThis(expression, bindingContextProvider)) {
                 holder.registerProblem(
                     thisExpression,
                     KotlinBundle.message("redundant.explicit.this"),
@@ -58,14 +58,17 @@ class ExplicitThisInspection : AbstractKotlinInspection() {
             else -> null
         }
 
-        fun hasExplicitThis(expression: KtExpression): Boolean {
+        fun hasExplicitThis(
+            expression: KtExpression,
+            bindingContextProvider: PartialBindingContextProvider
+        ): Boolean {
             val thisExpression = expression.thisAsReceiverOrNull() ?: return false
             val reference = when (expression) {
                 is KtCallableReferenceExpression -> expression.callableReference
                 is KtDotQualifiedExpression -> expression.selectorExpression as? KtReferenceExpression
                 else -> null
             } ?: return false
-            val context = expression.analyze()
+            val context = bindingContextProvider.analyze(expression) ?: return false
             val scope = expression.getResolutionScope(context) ?: return false
 
             val referenceExpression = reference as? KtNameReferenceExpression ?: reference.getChildOfType() ?: return false

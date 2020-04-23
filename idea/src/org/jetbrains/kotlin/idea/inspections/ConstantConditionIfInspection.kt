@@ -32,11 +32,11 @@ import org.jetbrains.kotlin.resolve.calls.callUtil.getType
 import org.jetbrains.kotlin.resolve.constants.evaluate.ConstantExpressionEvaluator
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
-class ConstantConditionIfInspection : AbstractKotlinInspection() {
+class ConstantConditionIfInspection : AbstractPartialContextProviderInspection() {
 
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor {
         return ifExpressionVisitor { expression ->
-            val constantValue = expression.getConditionConstantValueIfAny() ?: return@ifExpressionVisitor
+            val constantValue = expression.getConditionConstantValueIfAny(bindingContextProvider) ?: return@ifExpressionVisitor
             val fixes = collectFixes(expression, constantValue)
             holder.registerProblem(
                 expression.condition!!,
@@ -47,14 +47,14 @@ class ConstantConditionIfInspection : AbstractKotlinInspection() {
     }
 
     companion object {
-        private fun KtIfExpression.getConditionConstantValueIfAny(): Boolean? {
-            val context = condition?.analyze(BodyResolveMode.PARTIAL_WITH_CFA) ?: return null
+        private fun KtIfExpression.getConditionConstantValueIfAny(bindingContextProvider: PartialBindingContextProvider): Boolean? {
+            val context = condition?.let { bindingContextProvider.resolve(it, BodyResolveMode.PARTIAL_WITH_CFA) } ?: return null
             return condition?.constantBooleanValue(context)
         }
 
         private fun collectFixes(
             expression: KtIfExpression,
-            constantValue: Boolean? = expression.getConditionConstantValueIfAny()
+            constantValue: Boolean?
         ): List<ConstantConditionIfFix> {
             if (constantValue == null) return emptyList()
             val fixes = mutableListOf<ConstantConditionIfFix>()
@@ -75,8 +75,9 @@ class ConstantConditionIfInspection : AbstractKotlinInspection() {
             return fixes
         }
 
-        fun applyFixIfSingle(ifExpression: KtIfExpression) {
-            collectFixes(ifExpression).singleOrNull()?.applyFix(ifExpression)
+        fun applyFixIfSingle(ifExpression: KtIfExpression, bindingContextProvider: PartialBindingContextProvider) {
+            val constantValue = ifExpression.getConditionConstantValueIfAny(bindingContextProvider)
+            collectFixes(ifExpression, constantValue).singleOrNull()?.applyFix(ifExpression)
         }
     }
 

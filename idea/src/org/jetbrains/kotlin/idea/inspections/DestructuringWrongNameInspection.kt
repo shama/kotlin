@@ -12,12 +12,13 @@ import org.jetbrains.kotlin.descriptors.ClassDescriptor
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.psi.destructuringDeclarationVisitor
+import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
-class DestructuringWrongNameInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+class DestructuringWrongNameInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor {
         return destructuringDeclarationVisitor(fun(destructuringDeclaration) {
             val initializer = destructuringDeclaration.initializer ?: return
-            val type = initializer.analyze().getType(initializer) ?: return
+            val type = bindingContextProvider.resolve(initializer, BodyResolveMode.FULL)?.getType(initializer) ?: return
 
             val classDescriptor = type.constructor.declarationDescriptor as? ClassDescriptor ?: return
 

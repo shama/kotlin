@@ -15,13 +15,11 @@
  */
 package org.jetbrains.kotlin.idea.inspections
 
-import com.intellij.codeInspection.LocalInspectionToolSession
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.asJava.classes.KtLightClassImpl
 import org.jetbrains.kotlin.idea.KotlinBundle
-import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.core.getModalityFromDescriptor
 import org.jetbrains.kotlin.idea.quickfix.sealedSubClassToObject.ConvertSealedSubClassToObjectFix
 import org.jetbrains.kotlin.idea.quickfix.sealedSubClassToObject.GenerateIdentityEqualsFix
@@ -37,8 +35,8 @@ import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.descriptorUtil.getSuperClassNotAny
 import org.jetbrains.kotlin.util.OperatorNameConventions
 
-class CanSealedSubClassBeObjectInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
+class CanSealedSubClassBeObjectInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider): PsiElementVisitor {
         return object : KtVisitorVoid() {
             override fun visitClass(klass: KtClass) {
                 if (!klass.hasModifier(KtTokens.SEALED_KEYWORD)) return
@@ -51,7 +49,7 @@ class CanSealedSubClassBeObjectInspection : AbstractKotlinInspection() {
                     .thatHasNoInnerClasses()
                     .thatHasNoCompanionObjects()
                     .thatHasNoStateOrEquals()
-                if (candidates.isEmpty() || !klass.hasNoStateOrEquals() || !klass.baseClassHasNoStateOrEquals()) return
+                if (candidates.isEmpty() || !klass.hasNoStateOrEquals() || !klass.baseClassHasNoStateOrEquals(bindingContextProvider)) return
 
                 candidates.forEach { reportPossibleObject(it) }
             }
@@ -100,12 +98,12 @@ class CanSealedSubClassBeObjectInspection : AbstractKotlinInspection() {
         return filter { it.hasNoStateOrEquals() }
     }
 
-    private tailrec fun KtClass.baseClassHasNoStateOrEquals(): Boolean {
-        val descriptor = resolveToDescriptorIfAny() ?: return false
+    private tailrec fun KtClass.baseClassHasNoStateOrEquals(bindingContextProvider: PartialBindingContextProvider): Boolean {
+        val descriptor = bindingContextProvider.resolveToClassDescriptor(this) ?: return false
         val superDescriptor = descriptor.getSuperClassNotAny() ?: return true // No super class -- no state
         val superClass = DescriptorToSourceUtils.descriptorToDeclaration(superDescriptor) as? KtClass ?: return false
         if (!superClass.hasNoStateOrEquals()) return false
-        return superClass.baseClassHasNoStateOrEquals()
+        return superClass.baseClassHasNoStateOrEquals(bindingContextProvider)
     }
 
     private fun KtClass.hasNoStateOrEquals(): Boolean {

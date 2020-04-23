@@ -5,11 +5,8 @@
 
 package org.jetbrains.kotlin.idea.inspections
 
-import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.bindingContextUtil.isUsedAsExpression
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall

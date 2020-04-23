@@ -31,7 +31,6 @@ import org.jetbrains.kotlin.cfg.pseudocode.instructions.eval.WriteValueInstructi
 import org.jetbrains.kotlin.cfg.pseudocode.instructions.special.LocalFunctionDeclarationInstruction
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.idea.KotlinBundle
-import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.quickfix.ChangeVariableMutabilityFix
 import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
 import org.jetbrains.kotlin.idea.references.readWriteAccess
@@ -41,13 +40,17 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import java.util.*
 
-class CanBeValInspection : AbstractKotlinInspection() {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+class CanBeValInspection : AbstractPartialContextProviderInspection() {
+    override fun buildVisitor(
+        holder: ProblemsHolder,
+        isOnTheFly: Boolean,
+        bindingContextProvider: PartialBindingContextProvider
+    ): PsiElementVisitor {
         return object : KtVisitorVoid() {
             private val pseudocodeCache = HashMap<KtDeclaration, Pseudocode>()
             override fun visitDeclaration(declaration: KtDeclaration) {
                 super.visitDeclaration(declaration)
-                if (declaration is KtValVarKeywordOwner && canBeVal(declaration, pseudocodeCache, ignoreNotUsedVals = true)) {
+                if (declaration is KtValVarKeywordOwner && canBeVal(declaration, pseudocodeCache, true, bindingContextProvider)) {
                     reportCanBeVal(declaration)
                 }
             }
@@ -71,7 +74,8 @@ class CanBeValInspection : AbstractKotlinInspection() {
         fun canBeVal(
             declaration: KtDeclaration,
             pseudocodeCache: HashMap<KtDeclaration, Pseudocode> = HashMap(),
-            ignoreNotUsedVals: Boolean
+            ignoreNotUsedVals: Boolean,
+            bindingContextProvider: PartialBindingContextProvider
         ): Boolean {
             when (declaration) {
                 is KtProperty -> {
@@ -81,7 +85,8 @@ class CanBeValInspection : AbstractKotlinInspection() {
                             declaration.hasInitializer() || declaration.hasDelegateExpression(),
                             listOf(declaration),
                             ignoreNotUsedVals,
-                            pseudocodeCache
+                            pseudocodeCache,
+                            bindingContextProvider
                         )
                     ) {
                         return true
@@ -90,7 +95,16 @@ class CanBeValInspection : AbstractKotlinInspection() {
 
                 is KtDestructuringDeclaration -> {
                     val entries = declaration.entries
-                    if (declaration.isVar && entries.all { canBeVal(it, true, entries, ignoreNotUsedVals, pseudocodeCache) }) {
+                    if (declaration.isVar && entries.all {
+                            canBeVal(
+                                it,
+                                true,
+                                entries,
+                                ignoreNotUsedVals,
+                                pseudocodeCache,
+                                bindingContextProvider
+                            )
+                        }) {
                         return true
                     }
                 }
@@ -103,7 +117,8 @@ class CanBeValInspection : AbstractKotlinInspection() {
             hasInitializerOrDelegate: Boolean,
             allDeclarations: Collection<KtVariableDeclaration>,
             ignoreNotUsedVals: Boolean,
-            pseudocodeCache: MutableMap<KtDeclaration, Pseudocode>
+            pseudocodeCache: MutableMap<KtDeclaration, Pseudocode>,
+            bindingContextProvider: PartialBindingContextProvider
         ): Boolean {
             if (ignoreNotUsedVals && allDeclarations.all { ReferencesSearch.search(it, it.useScope).none() }) {
                 // do not report for unused var's (otherwise we'll get it highlighted immediately after typing the declaration
@@ -116,7 +131,7 @@ class CanBeValInspection : AbstractKotlinInspection() {
                 }
                 !hasWriteUsages
             } else {
-                val bindingContext = declaration.analyze(BodyResolveMode.FULL)
+                val bindingContext = bindingContextProvider.resolve(declaration, BodyResolveMode.FULL) ?: return false
                 val pseudocode = pseudocode(declaration, bindingContext, pseudocodeCache) ?: return false
                 val descriptor = bindingContext[BindingContext.DECLARATION_TO_DESCRIPTOR, declaration] ?: return false
 

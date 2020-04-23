@@ -57,6 +57,13 @@ fun KtClassOrObject.resolveToDescriptorIfAny(
     return (this as KtDeclaration).resolveToDescriptorIfAny(resolutionFacade, bodyResolveMode) as? ClassDescriptor
 }
 
+fun KtClassOrObject.resolveToDescriptorIfAny(
+    context: BindingContext
+): ClassDescriptor? {
+    return (this as KtDeclaration).resolveToDescriptorIfAny(context) as? ClassDescriptor
+}
+
+
 fun KtNamedFunction.resolveToDescriptorIfAny(
     resolutionFacade: ResolutionFacade,
     bodyResolveMode: BodyResolveMode = BodyResolveMode.PARTIAL
@@ -70,6 +77,13 @@ fun KtProperty.resolveToDescriptorIfAny(
 ): VariableDescriptor? {
     return (this as KtDeclaration).resolveToDescriptorIfAny(resolutionFacade, bodyResolveMode) as? VariableDescriptor
 }
+
+fun KtProperty.resolveToDescriptorIfAny(
+    bindingContext: BindingContext
+): VariableDescriptor? {
+    return (this as KtDeclaration).resolveToDescriptorIfAny(bindingContext) as? VariableDescriptor
+}
+
 
 fun KtParameter.resolveToParameterDescriptorIfAny(
     resolutionFacade: ResolutionFacade,

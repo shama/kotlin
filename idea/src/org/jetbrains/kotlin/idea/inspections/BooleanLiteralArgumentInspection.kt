@@ -13,8 +13,6 @@ import com.intellij.codeInspection.ui.MultipleCheckboxOptionsPanel
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.idea.KotlinBundle
-import org.jetbrains.kotlin.idea.caches.resolve.analyze
-import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
 import org.jetbrains.kotlin.idea.intentions.AddNameToArgumentIntention
 import org.jetbrains.kotlin.idea.intentions.AddNamesToCallArgumentsIntention
 import org.jetbrains.kotlin.idea.intentions.AddNamesToFollowingArgumentsIntention
@@ -25,14 +23,14 @@ import javax.swing.JComponent
 
 class BooleanLiteralArgumentInspection(
     @JvmField var reportSingle: Boolean = false
-) : AbstractKotlinInspection() {
+) : AbstractPartialContextProviderInspection() {
     private fun KtExpression.isBooleanLiteral(): Boolean =
         this is KtConstantExpression && node.elementType == KtNodeTypes.BOOLEAN_CONSTANT
 
     private fun KtValueArgument.isUnnamedBooleanLiteral(): Boolean =
         !isNamed() && getArgumentExpression()?.isBooleanLiteral() == true
 
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean) =
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, bindingContextProvider: PartialBindingContextProvider) =
         valueArgumentVisitor(fun(argument: KtValueArgument) {
             if (argument.isNamed()) return
             val argumentExpression = argument.getArgumentExpression() ?: return
@@ -40,10 +38,14 @@ class BooleanLiteralArgumentInspection(
             val call = argument.getStrictParentOfType<KtCallExpression>() ?: return
             val valueArguments = call.valueArguments
 
-            if (argumentExpression.analyze().diagnostics.forElement(argumentExpression).any { it.severity == Severity.ERROR }) return
+            if (bindingContextProvider.resolve(argumentExpression)?.diagnostics?.forElement(argumentExpression)
+                    ?.any { it.severity == Severity.ERROR } != false
+            ) {
+                return
+            }
             if (AddNameToArgumentIntention.detectNameToAdd(argument, shouldBeLastUnnamed = false) == null) return
 
-            val resolvedCall = call.resolveToCall() ?: return
+            val resolvedCall = bindingContextProvider.resolveToCall(call) ?: return
             if (!resolvedCall.candidateDescriptor.hasStableParameterNames()) return
             val languageVersionSettings = call.languageVersionSettings
             if (valueArguments.any {
