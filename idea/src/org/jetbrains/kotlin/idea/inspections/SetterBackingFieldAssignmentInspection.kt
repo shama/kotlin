@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2018 JetBrains s.r.o. and Kotlin Programming Language contributors.
+ * Copyright 2010-2020 JetBrains s.r.o. and Kotlin Programming Language contributors.
  * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
  */
 
@@ -21,8 +21,8 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 
 class SetterBackingFieldAssignmentInspection : AbstractKotlinInspection(), CleanupLocalInspectionTool {
-    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor {
-        return propertyAccessorVisitor(fun(accessor) {
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean, session: LocalInspectionToolSession): PsiElementVisitor =
+        propertyAccessorVisitor(fun(accessor) {
             if (!accessor.isSetter) return
             val bodyExpression = accessor.bodyBlockExpression ?: return
 
@@ -60,7 +60,6 @@ class SetterBackingFieldAssignmentInspection : AbstractKotlinInspection(), Clean
                 AssignBackingFieldFix()
             )
         })
-    }
 
     private fun KtExpression?.isBackingFieldReference(property: KtProperty) = with(SuspiciousVarPropertyInspection) {
         this@isBackingFieldReference != null && isBackingFieldReference(property)
@@ -85,6 +84,7 @@ private class AssignBackingFieldFix : LocalQuickFix {
             ?.takeWhile { it != bodyExpression.rBrace }
             ?.singleOrNull { it is PsiWhiteSpace }
             ?.also { it.delete() }
-        bodyExpression.addBefore(KtPsiFactory(setter).createExpression("field = ${parameter.text}"), bodyExpression.rBrace)
+
+        bodyExpression.addBefore(KtPsiFactory(setter).createExpression("field = ${parameter.name}"), bodyExpression.rBrace)
     }
 }
