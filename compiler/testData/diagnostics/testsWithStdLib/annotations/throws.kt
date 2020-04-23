@@ -124,3 +124,41 @@ fun foo3() {}
 fun foo5(x: Throws) {}
 fun foo6(x: kotlin.Throws) {}
 fun foo7(x: kotlin.jvm.Throws) {}
+
+// FILE: main8.kt
+package abc8
+
+import kotlin.*
+import kotlin.jvm.Throws
+
+@Throws(Exception::class)
+fun foo1() {}
+
+@kotlin.Throws(Exception::class)
+fun foo2() {}
+
+@kotlin.jvm.Throws(Exception::class)
+fun foo3() {}
+
+fun foo5(x: Throws) {}
+fun foo6(x: kotlin.Throws) {}
+fun foo7(x: kotlin.jvm.Throws) {}
+
+// FILE: main9.kt
+package abc9
+
+import kotlin.jvm.*
+import kotlin.Throws
+
+@Throws(Exception::class)
+fun foo1() {}
+
+@kotlin.Throws(Exception::class)
+fun foo2() {}
+
+@kotlin.jvm.Throws(Exception::class)
+fun foo3() {}
+
+fun foo5(x: Throws) {}
+fun foo6(x: kotlin.Throws) {}
+fun foo7(x: kotlin.jvm.Throws) {}
