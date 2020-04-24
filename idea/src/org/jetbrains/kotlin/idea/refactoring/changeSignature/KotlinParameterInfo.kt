@@ -28,16 +28,23 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ImplicitReceiver
 import org.jetbrains.kotlin.types.isError
 
 private fun defaultValVarSpecifierForDescriptorParameter(descriptor: CallableDescriptor): KotlinValVar =
-    if (descriptor is ConstructorDescriptor && descriptor.isPrimary && descriptor.constructedClass.isData)
-        KotlinValVar.Val
-    else
-        KotlinValVar.None
+    when {
+        descriptor is ConstructorDescriptor && descriptor.isPrimary -> when {
+            descriptor.constructedClass.isData || descriptor.constructedClass.isInline -> KotlinValVar.Val
+            else -> KotlinValVar.None
+        }
+        else -> KotlinValVar.None
+    }
 
-private fun allowedValVarSpecifiersForDescriptorParameter(descriptor: CallableDescriptor): Array<KotlinValVar> {
-    if (!(descriptor is ConstructorDescriptor && descriptor.isPrimary)) return arrayOf(KotlinValVar.None)
-
-    return if (descriptor.constructedClass.isData) arrayOf(KotlinValVar.Val, KotlinValVar.Var) else KotlinValVar.values()
-}
+private fun allowedValVarSpecifiersForDescriptorParameter(descriptor: CallableDescriptor): Array<KotlinValVar> =
+    when {
+        descriptor is ConstructorDescriptor && descriptor.isPrimary -> when {
+            descriptor.constructedClass.isData -> arrayOf(KotlinValVar.Val, KotlinValVar.Var)
+            descriptor.constructedClass.isInline -> arrayOf(KotlinValVar.Val)
+            else -> KotlinValVar.values()
+        }
+        else -> arrayOf(KotlinValVar.None)
+    }
 
 class KotlinParameterInfo @JvmOverloads constructor(
     val callableDescriptor: CallableDescriptor,

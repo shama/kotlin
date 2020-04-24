@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.calls.callUtil.getCall
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
+import org.jetbrains.kotlin.resolve.descriptorUtil.isPrimaryConstructorOfInlineClass
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.checker.KotlinTypeChecker
 import java.util.*
@@ -108,6 +109,8 @@ class AddFunctionParametersFix(
     override fun isAvailable(project: Project, editor: Editor?, file: KtFile): Boolean {
         if (!super.isAvailable(project, editor, file)) return false
         val callElement = callElement ?: return false
+
+        if (functionDescriptor.isPrimaryConstructorOfInlineClass()) return false
 
         // newParametersCnt <= 0: psi for this quickfix is no longer valid
         val newParametersCnt = callElement.valueArguments.size - functionDescriptor.valueParameters.size
